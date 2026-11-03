@@ -76,10 +76,10 @@ test("una nuova installazione crea una scheda di esempio con stati modificabili"
 
   const workspace = database.load();
   assert.equal(workspace.boards.length, 1);
-  assert.deepEqual(workspace.boards[0].columns.map((column) => column.name), ["Elemento", "Persona", "Stato", "Priorità", "Scadenza"]);
+  assert.deepEqual(workspace.boards[0].columns.map((column) => column.name), ["Elemento", "Stato", "Priorità", "Scadenza"]);
   assert.equal(workspace.boards[0].items.length, 3);
-  assert.deepEqual(workspace.boards[0].columns[2].options, ["Non iniziato", "In lavorazione", "Finito"]);
-  assert.deepEqual(workspace.boards[0].columns[3].options, ["Bassa", "Media", "Alta"]);
+  assert.deepEqual(workspace.boards[0].columns[1].options, ["Non iniziato", "In lavorazione", "Finito"]);
+  assert.deepEqual(workspace.boards[0].columns[2].options, ["Bassa", "Media", "Alta"]);
   assert.equal(workspace.boards[0].groups.filter((group) => group.kind === "completed").length, 1);
   assert.equal(workspace.boards[0].items.find((item) => item.name === "Definire gli obiettivi").groupId, "group-completed");
   const emptyBoard = {
@@ -145,12 +145,16 @@ test("aggiorna un database esistente conservando gli elementi", (context) => {
     CREATE TABLE item_cells (item_id TEXT NOT NULL REFERENCES board_items(id) ON DELETE CASCADE, column_id TEXT NOT NULL REFERENCES board_columns(id) ON DELETE CASCADE, value TEXT NOT NULL DEFAULT '', PRIMARY KEY(item_id, column_id));
     INSERT INTO boards VALUES ('existing-board', 'La mia tabella', '', 0);
     INSERT INTO board_columns VALUES ('existing-name', 'existing-board', 'Elemento', 'name', 0, '[]');
-    INSERT INTO board_columns VALUES ('existing-status', 'existing-board', 'Stato', 'status', 1, '["Por hacer","En progreso","Completado"]');
+    INSERT INTO board_columns VALUES ('existing-person', 'existing-board', 'Persona', 'person', 1, '[]');
+    INSERT INTO board_columns VALUES ('existing-status', 'existing-board', 'Stato', 'status', 2, '["Por hacer","En progreso","Completado"]');
+    INSERT INTO board_columns VALUES ('existing-assignee', 'existing-board', 'Responsabile', 'person', 3, '[]');
     INSERT INTO task_groups VALUES ('existing-group', 'existing-board', 'Attività', '#5b9df5', 0);
     INSERT INTO board_items VALUES ('existing-item', 'existing-board', 'existing-group', 'Conserva questa riga', 0);
     INSERT INTO board_items VALUES ('existing-done-item', 'existing-board', 'existing-group', 'Riga completata', 1);
     INSERT INTO item_cells VALUES ('existing-item', 'existing-status', 'En progreso');
     INSERT INTO item_cells VALUES ('existing-done-item', 'existing-status', 'Completado');
+    INSERT INTO item_cells VALUES ('existing-item', 'existing-person', 'Persona precedente');
+    INSERT INTO item_cells VALUES ('existing-item', 'existing-assignee', 'Ada');
   `);
   legacy.close();
 
@@ -159,6 +163,11 @@ test("aggiorna un database esistente conservando gli elementi", (context) => {
   assert.equal(upgraded.getTheme(), "light");
   const existingBoard = workspace.boards[0];
   assert.equal(existingBoard.name, "La mia tabella");
+  assert.equal(existingBoard.columns.some((column) => column.id === "existing-person"), false);
+  assert.equal(existingBoard.columns.find((column) => column.id === "existing-assignee").name, "Responsabile");
+  assert.equal(existingBoard.items.find((item) => item.id === "existing-item").cells["existing-person"], undefined);
+  assert.equal(existingBoard.items.find((item) => item.id === "existing-item").cells["existing-assignee"], "Ada");
+  assert.deepEqual(existingBoard.columns.map((column) => column.position), [0, 1, 2, 3, 4]);
   assert.equal(existingBoard.items[0].name, "Conserva questa riga");
   assert.deepEqual(existingBoard.columns.find((column) => column.id === "existing-status").options, ["Non iniziato", "In lavorazione", "Finito"]);
   assert.equal(existingBoard.columns.some((column) => column.role === "priority"), true);

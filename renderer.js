@@ -696,7 +696,6 @@ async function createBoard(event) {
   const values = new FormData(ui.boardForm);
   const name = String(values.get("name")).trim();
   if (!name) return toast("Inserisci il nome della tabella.");
-  const columnId = createId("column");
   const statusColumnId = createId("column");
   const priorityColumnId = createId("column");
   const deadlineColumnId = createId("column");
@@ -707,10 +706,9 @@ async function createBoard(event) {
     description: String(values.get("description")).trim(),
     columns: [
       { id: nameColumnId, name: "Elemento", type: "name", role: "", position: 0, options: [] },
-      { id: columnId, name: "Persona", type: "person", role: "", position: 1, options: [] },
-      { id: statusColumnId, name: "Stato", type: "status", role: "", position: 2, options: ["Non iniziato", "In lavorazione", "Finito"] },
-      { id: priorityColumnId, name: "Priorità", type: "status", role: "priority", position: 3, options: [...PRIORITY_OPTIONS] },
-      { id: deadlineColumnId, name: "Scadenza", type: "date", role: "", position: 4, options: [] }
+      { id: statusColumnId, name: "Stato", type: "status", role: "", position: 1, options: ["Non iniziato", "In lavorazione", "Finito"] },
+      { id: priorityColumnId, name: "Priorità", type: "status", role: "priority", position: 2, options: [...PRIORITY_OPTIONS] },
+      { id: deadlineColumnId, name: "Scadenza", type: "date", role: "", position: 3, options: [] }
     ],
     groups: [
       { id: createId("group"), name: "Gruppo 1", color: GROUP_COLORS[state.boards.length % GROUP_COLORS.length], position: 0, kind: "active" },

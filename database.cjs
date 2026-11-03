@@ -22,7 +22,6 @@ function createStarterWorkspace() {
   const groupId = "group-starter";
   const completedGroupId = "group-completed";
   const nameColumnId = "column-name";
-  const personColumnId = "column-person";
   const statusColumnId = "column-status";
   const priorityColumnId = "column-priority";
   const deadlineColumnId = "column-deadline";
@@ -34,19 +33,18 @@ function createStarterWorkspace() {
       description: "Pianifica, organizza e segui le attività del tuo team.",
       columns: [
         { id: nameColumnId, name: "Elemento", type: "name", position: 0, options: [] },
-        { id: personColumnId, name: "Persona", type: "person", position: 1, options: [] },
-        { id: statusColumnId, name: "Stato", type: "status", position: 2, options: DEFAULT_STATUS_OPTIONS },
-        { id: priorityColumnId, name: "Priorità", type: "status", role: "priority", position: 3, options: PRIORITY_OPTIONS },
-        { id: deadlineColumnId, name: "Scadenza", type: "date", position: 4, options: [] }
+        { id: statusColumnId, name: "Stato", type: "status", position: 1, options: DEFAULT_STATUS_OPTIONS },
+        { id: priorityColumnId, name: "Priorità", type: "status", role: "priority", position: 2, options: PRIORITY_OPTIONS },
+        { id: deadlineColumnId, name: "Scadenza", type: "date", position: 3, options: [] }
       ],
       groups: [
         { id: groupId, name: "Gruppo 1", color: "#5b9df5", position: 0, kind: "active" },
         { id: completedGroupId, name: "Completate", color: "#36b681", position: 1, kind: "completed" }
       ],
       items: [
-        { id: "item-starter-1", groupId, name: "Pianificare il progetto", position: 0, previousGroupId: "", cells: { [personColumnId]: "", [statusColumnId]: "In lavorazione", [priorityColumnId]: "Alta", [deadlineColumnId]: date(3) } },
-        { id: "item-starter-2", groupId, name: "Preparare i materiali", position: 1, previousGroupId: "", cells: { [personColumnId]: "", [statusColumnId]: "Non iniziato", [priorityColumnId]: "Media", [deadlineColumnId]: date(7) } },
-        { id: "item-starter-3", groupId: completedGroupId, name: "Definire gli obiettivi", position: 0, previousGroupId: groupId, cells: { [personColumnId]: "", [statusColumnId]: "Finito", [priorityColumnId]: "Bassa", [deadlineColumnId]: date(-2) } }
+        { id: "item-starter-1", groupId, name: "Pianificare il progetto", position: 0, previousGroupId: "", cells: { [statusColumnId]: "In lavorazione", [priorityColumnId]: "Alta", [deadlineColumnId]: date(3) } },
+        { id: "item-starter-2", groupId, name: "Preparare i materiali", position: 1, previousGroupId: "", cells: { [statusColumnId]: "Non iniziato", [priorityColumnId]: "Media", [deadlineColumnId]: date(7) } },
+        { id: "item-starter-3", groupId: completedGroupId, name: "Definire gli obiettivi", position: 0, previousGroupId: groupId, cells: { [statusColumnId]: "Finito", [priorityColumnId]: "Bassa", [deadlineColumnId]: date(-2) } }
       ]
     }]
   };
@@ -139,6 +137,7 @@ class WorkspaceDatabase {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.db.exec("UPDATE task_groups SET kind = 'completed' WHERE lower(trim(name)) = 'completate'");
+      this.db.prepare("DELETE FROM board_columns WHERE type = 'person' AND lower(trim(name)) = 'persona'").run();
       const boards = this.db.prepare("SELECT id FROM boards ORDER BY position").all();
       const selectColumns = this.db.prepare("SELECT id, type, role, options_json AS optionsJson FROM board_columns WHERE board_id = ?");
       const insertColumn = this.db.prepare(
@@ -173,6 +172,11 @@ class WorkspaceDatabase {
         if (!columns.some((column) => column.type === "date")) {
           insertColumn.run(`column-deadline-${randomUUID()}`, boardId, "Scadenza", "date", "", count++, "[]");
         }
+        const orderedColumns = this.db.prepare(
+          "SELECT id FROM board_columns WHERE board_id = ? ORDER BY position, rowid"
+        ).all(boardId);
+        const updateColumnPosition = this.db.prepare("UPDATE board_columns SET position = ? WHERE id = ?");
+        for (const [position, column] of orderedColumns.entries()) updateColumnPosition.run(position, column.id);
         let groups = selectGroups.all(boardId);
         const completedGroups = groups.filter((group) => group.kind === "completed");
         for (const duplicate of completedGroups.slice(1)) {
