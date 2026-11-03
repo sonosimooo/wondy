@@ -57,6 +57,7 @@ test("packaged builds check manually and report a failed update request", async 
   assert.deepEqual(await updates.checkForUpdates({ userInitiated: true }), { status: "error" });
   assert.equal(dependencies.errors.length, 1);
   assert.equal(dependencies.messages[0].title, "Aggiornamento non riuscito");
+  assert.match(dependencies.messages[0].detail, /offline/);
   updates.dispose();
 });
 

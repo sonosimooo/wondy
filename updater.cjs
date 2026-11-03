@@ -30,11 +30,12 @@ function registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow, logger =
     logger.error(message, error);
     sendStatus("error", "Impossibile controllare gli aggiornamenti.");
     if (notify) {
+      const errorDetail = error instanceof Error ? error.message : String(error ?? "Errore non specificato.");
       void showMessage({
         type: "error",
         title: "Aggiornamento non riuscito",
         message: "Wondy non è riuscito a completare l'aggiornamento.",
-        detail: "Controlla la connessione a Internet e riprova."
+        detail: `Riprova tra poco. Dettaglio: ${errorDetail.slice(0, 500)}`
       }).catch((dialogError) => logger.error("Impossibile visualizzare l'errore di aggiornamento.", dialogError));
     }
   }

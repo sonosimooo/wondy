@@ -59,4 +59,16 @@ jobs:
               throw "File necessario per gli aggiornamenti non trovato: $file"
             }
           }
-          gh release upload $env:RELEASE_TAG $installer "dist/latest.yml" $blockmap --clobber
+          gh release upload $env:RELEASE_TAG $installer --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Caricamento installer non riuscito." }
+          gh release upload $env:RELEASE_TAG "dist/latest.yml" --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Caricamento latest.yml non riuscito." }
+          gh release upload $env:RELEASE_TAG $blockmap --clobber
+          if ($LASTEXITCODE -ne 0) { throw "Caricamento blockmap non riuscito." }
+          $assets = gh api "repos/$env:GITHUB_REPOSITORY/releases/tags/$env:RELEASE_TAG" --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0) { throw "Impossibile verificare gli asset della release." }
+          foreach ($requiredAsset in @([IO.Path]::GetFileName($installer), "latest.yml", [IO.Path]::GetFileName($blockmap))) {
+            if ($assets -notcontains $requiredAsset) {
+              throw "Asset mancante nella release $env:RELEASE_TAG`: $requiredAsset"
+            }
+          }
