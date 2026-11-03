@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag della release da pubblicare
+        required: true
+        default: v0.0.1
 
 permissions:
   contents: write
@@ -23,10 +29,12 @@ jobs:
 
       - name: Verifica che il tag corrisponda alla versione
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          if ("v$version" -ne $env:GITHUB_REF_NAME) {
-            throw "Il tag $env:GITHUB_REF_NAME non corrisponde alla versione v$version in package.json."
+          if ("v$version" -ne $env:RELEASE_TAG) {
+            throw "Il tag $env:RELEASE_TAG non corrisponde alla versione v$version in package.json."
           }
 
       - name: Installa dipendenze
@@ -36,3 +44,19 @@ jobs:
         run: npm run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verifica e carica installer e file di aggiornamento
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installer = "dist/Wondy-$version-Setup.exe"
+          $blockmap = "$installer.blockmap"
+          foreach ($file in @($installer, "dist/latest.yml", $blockmap)) {
+            if (-not (Test-Path $file -PathType Leaf)) {
+              throw "File necessario per gli aggiornamenti non trovato: $file"
+            }
+          }
+          gh release upload $env:RELEASE_TAG $installer "dist/latest.yml" $blockmap --clobber
