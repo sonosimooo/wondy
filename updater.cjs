@@ -1,5 +1,4 @@
 const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
-const INITIAL_CHECK_DELAY_MS = 12 * 1000;
 
 function registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow, logger = console }) {
   let checkPromise = null;
@@ -8,8 +7,8 @@ function registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow, logger =
   let failureDialogShown = false;
   let downloadedVersion = "";
   let disposed = false;
-  let initialCheck;
   let periodicCheck;
+  let started = false;
 
   function showMessage(options) {
     const window = BrowserWindow.getAllWindows().find((entry) => !entry.isDestroyed());
@@ -46,7 +45,7 @@ function registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow, logger =
       title: "Aggiornamento pronto",
       message: `Wondy ${version} è pronto per essere installato.`,
       detail: "L'applicazione si riavvierà per completare l'aggiornamento. I tuoi dati personali resteranno invariati.",
-      buttons: ["Installa e riavvia", "Più tardi"],
+      buttons: ["Installa e riavvia", "Rimanda"],
       defaultId: 0,
       cancelId: 1,
       noLink: true
@@ -76,10 +75,10 @@ function registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow, logger =
     try {
       const result = await showMessage({
         type: "info",
-        title: "Nuova versione disponibile",
-        message: `Wondy ${info.version} è disponibile.`,
-        detail: "Vuoi scaricare l'aggiornamento adesso? Potrai installarlo quando il download sarà terminato. I tuoi dati rimangono salvati.",
-        buttons: ["Scarica aggiornamento", "Più tardi"],
+        title: "Aggiornamento disponibile",
+        message: `Wondy ${info.version} è disponibile. Vuoi aggiornare ora?`,
+        detail: "Se scegli Aggiorna ora, il download inizierà subito. Al termine potrai installare e riavviare oppure rimandare. I tuoi dati rimangono salvati.",
+        buttons: ["Aggiorna ora", "Rimanda"],
         defaultId: 0,
         cancelId: 1,
         noLink: true
@@ -171,21 +170,22 @@ function registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow, logger =
   autoUpdater.on("update-downloaded", handleDownloadedUpdate);
   autoUpdater.on("error", handleUpdateError);
 
-  initialCheck = setTimeout(() => {
-    void checkForUpdates().catch((error) => reportError("Impossibile avviare il controllo degli aggiornamenti.", error));
-  }, INITIAL_CHECK_DELAY_MS);
-  periodicCheck = setInterval(() => {
-    void checkForUpdates().catch((error) => reportError("Impossibile avviare il controllo degli aggiornamenti.", error));
-  }, UPDATE_CHECK_INTERVAL_MS);
-  initialCheck.unref?.();
-  periodicCheck.unref?.();
+  function start() {
+    if (started) return Promise.resolve({ status: "already-started" });
+    started = true;
+    periodicCheck = setInterval(() => {
+      void checkForUpdates();
+    }, UPDATE_CHECK_INTERVAL_MS);
+    periodicCheck.unref?.();
+    return checkForUpdates();
+  }
 
   return {
     checkForUpdates,
+    start,
     dispose() {
       if (disposed) return;
       disposed = true;
-      clearTimeout(initialCheck);
       clearInterval(periodicCheck);
       autoUpdater.removeListener("update-available", handleAvailableUpdate);
       autoUpdater.removeListener("update-not-available", handleUpdateUnavailable);
@@ -196,4 +196,4 @@ function registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow, logger =
   };
 }
 
-module.exports = { registerAutoUpdater, INITIAL_CHECK_DELAY_MS, UPDATE_CHECK_INTERVAL_MS };
+module.exports = { registerAutoUpdater, UPDATE_CHECK_INTERVAL_MS };

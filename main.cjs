@@ -31,6 +31,9 @@ function createWindow() {
   window.webContents.on("will-navigate", (event, url) => {
     if (url !== appPage) event.preventDefault();
   });
+  window.once("ready-to-show", () => {
+    void updates.start();
+  });
   window.loadFile(path.join(__dirname, "index.html")).catch((error) => {
     console.error("Impossibile aprire la finestra principale di Wondy.", error);
     dialog.showErrorBox("Errore di avvio", "Wondy non riesce a caricare la propria interfaccia.");

@@ -72,3 +72,56 @@ test("packaged builds disable automatic downloads and remove updater listeners o
   updates.dispose();
   assert.equal(dependencies.autoUpdater.listenerCount("update-available"), 0);
 });
+
+test("packaged builds check immediately when the app starts and only once", async () => {
+  const dependencies = createDependencies({ isPackaged: true });
+  let checks = 0;
+  dependencies.autoUpdater.checkForUpdates = async () => {
+    checks += 1;
+    return { isUpdateAvailable: false, updateInfo: { version: "0.0.3" } };
+  };
+  const updates = registerAutoUpdater(dependencies);
+
+  assert.deepEqual(await updates.start(), { status: "checking", version: "0.0.3" });
+  assert.deepEqual(await updates.start(), { status: "already-started" });
+  assert.equal(checks, 1);
+  updates.dispose();
+});
+
+test("startup update prompt lets the user defer without downloading", async () => {
+  const dependencies = createDependencies({ isPackaged: true, response: 1 });
+  let downloads = 0;
+  dependencies.autoUpdater.checkForUpdates = async () => {
+    dependencies.autoUpdater.emit("update-available", { version: "0.0.3" });
+    return { isUpdateAvailable: true, updateInfo: { version: "0.0.3" } };
+  };
+  dependencies.autoUpdater.downloadUpdate = async () => {
+    downloads += 1;
+  };
+  const updates = registerAutoUpdater(dependencies);
+
+  await updates.start();
+  await new Promise(setImmediate);
+  assert.equal(dependencies.messages[0].title, "Aggiornamento disponibile");
+  assert.deepEqual(dependencies.messages[0].buttons, ["Aggiorna ora", "Rimanda"]);
+  assert.equal(downloads, 0);
+  updates.dispose();
+});
+
+test("confirming the startup update prompt starts the update download", async () => {
+  const dependencies = createDependencies({ isPackaged: true, response: 0 });
+  let downloads = 0;
+  dependencies.autoUpdater.checkForUpdates = async () => {
+    dependencies.autoUpdater.emit("update-available", { version: "0.0.3" });
+    return { isUpdateAvailable: true, updateInfo: { version: "0.0.3" } };
+  };
+  dependencies.autoUpdater.downloadUpdate = async () => {
+    downloads += 1;
+  };
+  const updates = registerAutoUpdater(dependencies);
+
+  await updates.start();
+  await new Promise(setImmediate);
+  assert.equal(downloads, 1);
+  updates.dispose();
+});
