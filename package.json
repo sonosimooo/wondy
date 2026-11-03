@@ -1,0 +1,64 @@
+{
+  "name": "wondy-desktop",
+  "version": "0.0.1",
+  "description": "Tabelle condivise per organizzare progetti e attività.",
+  "main": "main.cjs",
+  "author": "Wondy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sonosimooo/wondy.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis --publish never",
+    "release": "electron-builder --win nsis --publish always",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "electron": "^45.2.1",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "build": {
+    "appId": "com.wondy.desktop",
+    "productName": "Wondy",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "sonosimooo",
+      "repo": "wondy",
+      "releaseType": "release"
+    },
+    "artifactName": "Wondy-${version}-Setup.${ext}",
+    "generateUpdatesFilesForAllChannels": true,
+    "files": [
+      "main.cjs",
+      "preload.cjs",
+      "updater.cjs",
+      "database.cjs",
+      "index.html",
+      "styles.css",
+      "renderer.js",
+      "assets/**/*",
+      "build/icon.ico",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

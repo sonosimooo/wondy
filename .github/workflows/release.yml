@@ -1,0 +1,38 @@
+name: Pubblica Wondy per Windows
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Scarica il codice
+        uses: actions/checkout@v4
+
+      - name: Configura Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Verifica che il tag corrisponda alla versione
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          if ("v$version" -ne $env:GITHUB_REF_NAME) {
+            throw "Il tag $env:GITHUB_REF_NAME non corrisponde alla versione v$version in package.json."
+          }
+
+      - name: Installa dipendenze
+        run: npm ci
+
+      - name: Crea e pubblica installer e metadati di aggiornamento
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

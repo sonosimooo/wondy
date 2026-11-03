@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f6fa" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'"
+    />
+    <title>Wondy — Organizza il lavoro</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <a class="brand" href="#" aria-label="Wondy, pagina iniziale">
+          <img class="brand-logo" src="./assets/wondy-logo.png" alt="" />
+          <span>Wondy</span>
+        </a>
+
+        <div class="workspace-label">IL TUO SPAZIO DI LAVORO</div>
+        <div class="workspace-card">
+          <span class="workspace-icon">W</span>
+          <span class="workspace-info"><strong>Il mio spazio</strong><small>Spazio personale</small></span>
+          <span class="workspace-chevron" aria-hidden="true">⌄</span>
+        </div>
+
+        <div class="sidebar-section-header">
+          <span class="section-label">LE MIE SCHEDE</span>
+          <button id="add-board-button" class="icon-button" type="button" aria-label="Crea una nuova tabella" title="Crea tabella">＋</button>
+        </div>
+        <nav id="board-navigation" class="board-navigation" aria-label="Le mie tabelle"></nav>
+
+        <button id="sidebar-add-board-button" class="sidebar-create-button" type="button"><span>＋</span> Crea una tabella</button>
+        <div class="sidebar-spacer"></div>
+        <div class="local-storage-note"><span class="storage-dot"></span> Dati salvati in modo sicuro su questo dispositivo</div>
+        <div class="profile-button">
+          <span class="profile-avatar">W</span>
+          <span class="profile-info"><strong>Il mio account</strong><small>Spazio personale</small></span>
+          <span class="profile-dots">···</span>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumbs"><span>Le mie schede</span><span class="breadcrumb-divider">/</span><strong id="breadcrumb-board">Nuova scheda</strong></div>
+          <div class="topbar-right">
+            <label class="search-box">
+              <span class="search-glyph" aria-hidden="true">⌕</span>
+              <input id="search-input" type="search" placeholder="Cerca in questa tabella..." aria-label="Cerca in questa tabella" />
+              <kbd>Ctrl K</kbd>
+            </label>
+            <span class="profile-avatar top-avatar">W</span>
+          </div>
+        </header>
+
+        <section class="board-content">
+          <div class="board-heading">
+            <div class="title-block">
+              <span class="board-mark" aria-hidden="true">▦</span>
+              <div class="title-copy">
+                <h1 id="board-title">Nuova scheda</h1>
+                <p id="board-description">Organizza il lavoro del tuo team in un unico posto.</p>
+              </div>
+              <button id="rename-board-button" class="icon-button title-menu-button" type="button" aria-label="Rinomina o elimina tabella" title="Rinomina o elimina tabella">···</button>
+            </div>
+            <div class="heading-buttons">
+              <button id="rename-board-action" class="button button-outline" type="button">Rinomina</button>
+              <button id="add-row-button" class="button button-primary" type="button"><span class="button-plus">＋</span> Nuovo elemento</button>
+            </div>
+          </div>
+
+          <div class="board-toolbar">
+            <div class="table-tab"><span aria-hidden="true">▤</span> Scheda principale</div>
+            <div class="toolbar-actions">
+              <label class="filter-label" for="status-filter">Stato:</label>
+              <select id="status-filter" class="toolbar-select" aria-label="Filtra per stato">
+                <option value="">Tutti</option>
+              </select>
+              <button id="sort-button" class="toolbar-button" type="button" aria-pressed="false"><span aria-hidden="true">↕</span> Ordina per nome</button>
+              <button id="add-group-button" class="toolbar-button" type="button"><span aria-hidden="true">⊞</span> Nuovo gruppo</button>
+            </div>
+          </div>
+
+          <div id="board-view" class="board-view" aria-live="polite"></div>
+          <button id="board-add-row-button" class="board-add-row" type="button">＋ Aggiungi un elemento</button>
+        </section>
+        <footer class="app-footer">
+          <span id="app-version" aria-live="polite">Wondy versione 0.0.1</span>
+          <span id="app-update-status" role="status" aria-live="polite"></span>
+          <button id="check-updates-button" class="update-check-button" type="button">Controlla gli aggiornamenti</button>
+        </footer>
+        <div id="toast" class="toast" role="status" aria-live="polite"></div>
+      </main>
+    </div>
+
+    <dialog id="board-dialog" class="app-dialog">
+      <form id="board-form">
+        <div class="dialog-heading">
+          <div><span class="dialog-eyebrow">NUOVA TABELLA</span><h2>Crea una tabella</h2></div>
+          <button class="icon-button dialog-close" type="button" data-close-dialog aria-label="Chiudi">×</button>
+        </div>
+        <label class="field-label" for="board-name">Nome della tabella</label>
+        <input id="board-name" class="text-field" name="name" required maxlength="80" placeholder="Ad esempio, Piano di marketing" />
+        <label class="field-label" for="board-description">Descrizione <span>(facoltativa)</span></label>
+        <input id="board-description-input" class="text-field" name="description" maxlength="160" placeholder="A cosa serve questa tabella?" />
+        <p class="form-hint">La tabella sarà vuota e pronta da organizzare. Potrai aggiungere le colonne che ti servono.</p>
+        <div class="dialog-footer">
+          <span class="dialog-spacer"></span>
+          <button class="button button-outline" type="button" data-close-dialog>Annulla</button>
+          <button class="button button-primary" type="submit">Crea tabella</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="column-dialog" class="app-dialog">
+      <form id="column-form">
+        <div class="dialog-heading">
+          <div><span class="dialog-eyebrow">STRUTTURA DELLA TABELLA</span><h2>Aggiungi una colonna</h2></div>
+          <button class="icon-button dialog-close" type="button" data-close-dialog aria-label="Chiudi">×</button>
+        </div>
+        <label class="field-label" for="column-name">Nome della colonna</label>
+        <input id="column-name" class="text-field" name="name" required maxlength="60" placeholder="Ad esempio, Priorità" />
+        <label class="field-label" for="column-type">Tipo di informazione</label>
+        <select id="column-type" class="text-field" name="type">
+          <option value="text">Testo</option>
+          <option value="status">Stato</option>
+          <option value="priority">Priorità</option>
+          <option value="person">Persona</option>
+          <option value="date">Data</option>
+        </select>
+        <div id="status-options-field" hidden>
+          <label class="field-label" for="status-options">Opzioni degli stati <span>(una per riga)</span></label>
+          <textarea id="status-options" class="text-field text-area" name="options" rows="3">Non iniziato
+In lavorazione
+Finito</textarea>
+        </div>
+        <div class="dialog-footer">
+          <span class="dialog-spacer"></span>
+          <button class="button button-outline" type="button" data-close-dialog>Annulla</button>
+          <button class="button button-primary" type="submit">Aggiungi colonna</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="./renderer.js" defer></script>
+  </body>
+</html>
