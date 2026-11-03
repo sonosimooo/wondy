@@ -48,6 +48,14 @@ app.whenReady()
     ipcMain.handle("workspace:load", () => database.load());
     ipcMain.handle("workspace:save", (_event, workspace) => database.save(workspace));
     ipcMain.handle("app:get-version", () => app.getVersion());
+    ipcMain.handle("app:get-theme", (event) => {
+      if (!isTrustedApp(event)) throw new Error("Richiesta del tema non autorizzata.");
+      return database.getTheme();
+    });
+    ipcMain.handle("app:set-theme", (event, theme) => {
+      if (!isTrustedApp(event)) throw new Error("Richiesta del tema non autorizzata.");
+      return database.setTheme(theme);
+    });
     ipcMain.handle("app:check-for-updates", (event) => {
       if (!isTrustedApp(event)) throw new Error("Richiesta di aggiornamento non autorizzata.");
       return updates.checkForUpdates({ userInitiated: true });

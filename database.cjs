@@ -111,6 +111,7 @@ class WorkspaceDatabase {
       CREATE TABLE IF NOT EXISTS workspace_metadata (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         active_board_id TEXT REFERENCES boards(id) ON DELETE SET NULL,
+        theme TEXT NOT NULL DEFAULT 'light' CHECK (theme IN ('light', 'dark')),
         initialized INTEGER NOT NULL DEFAULT 1
       );
       CREATE INDEX IF NOT EXISTS board_items_board_position ON board_items(board_id, position);
@@ -120,6 +121,7 @@ class WorkspaceDatabase {
     this.ensureColumn("board_columns", "role", "TEXT NOT NULL DEFAULT ''");
     this.ensureColumn("task_groups", "kind", "TEXT NOT NULL DEFAULT 'active'");
     this.ensureColumn("board_items", "previous_group_id", "TEXT NOT NULL DEFAULT ''");
+    this.ensureColumn("workspace_metadata", "theme", "TEXT NOT NULL DEFAULT 'light' CHECK (theme IN ('light', 'dark'))");
     const initialized = this.db.prepare("SELECT initialized FROM workspace_metadata WHERE id = 1").get();
     const boardCount = this.db.prepare("SELECT COUNT(*) AS count FROM boards").get().count;
     if (boardCount === 0 && !initialized) this.save(createStarterWorkspace());
@@ -255,6 +257,21 @@ class WorkspaceDatabase {
         : (workspaceBoards[0]?.id ?? ""),
       boards: workspaceBoards
     };
+  }
+
+  getTheme() {
+    return this.db.prepare("SELECT theme FROM workspace_metadata WHERE id = 1").get()?.theme ?? "light";
+  }
+
+  setTheme(theme) {
+    if (theme !== "light" && theme !== "dark") {
+      throw new TypeError("Il tema deve essere 'light' oppure 'dark'.");
+    }
+    this.db.prepare(`
+      INSERT INTO workspace_metadata (id, theme, initialized) VALUES (1, ?, 1)
+      ON CONFLICT(id) DO UPDATE SET theme = excluded.theme
+    `).run(theme);
+    return true;
   }
 
   save(workspace) {

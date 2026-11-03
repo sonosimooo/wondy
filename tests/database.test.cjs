@@ -114,6 +114,23 @@ test("una nuova installazione crea una scheda di esempio con stati modificabili"
   afterEmpty.close();
 });
 
+test("salva la modalità scelta e la mantiene dopo aver riaperto il database", (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "wondy-theme-"));
+  context.after(() => rmSync(directory, { recursive: true, force: true }));
+  const file = path.join(directory, "workspace.sqlite");
+  const database = new WorkspaceDatabase(file);
+
+  assert.equal(database.getTheme(), "light");
+  assert.equal(database.setTheme("dark"), true);
+  assert.equal(database.getTheme(), "dark");
+  assert.throws(() => database.setTheme("system"), /tema deve essere/);
+  database.close();
+
+  const reopened = new WorkspaceDatabase(file);
+  assert.equal(reopened.getTheme(), "dark");
+  reopened.close();
+});
+
 test("aggiorna un database esistente conservando gli elementi", (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "wondy-migration-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -139,6 +156,7 @@ test("aggiorna un database esistente conservando gli elementi", (context) => {
 
   const upgraded = new WorkspaceDatabase(file);
   const workspace = upgraded.load();
+  assert.equal(upgraded.getTheme(), "light");
   const existingBoard = workspace.boards[0];
   assert.equal(existingBoard.name, "La mia tabella");
   assert.equal(existingBoard.items[0].name, "Conserva questa riga");

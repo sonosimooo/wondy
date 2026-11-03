@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld("wondy", Object.freeze({
   loadWorkspace: () => ipcRenderer.invoke("workspace:load"),
   saveWorkspace: (workspace) => ipcRenderer.invoke("workspace:save", workspace),
   getVersion: () => ipcRenderer.invoke("app:get-version"),
+  getTheme: () => ipcRenderer.invoke("app:get-theme"),
+  setTheme: (theme) => ipcRenderer.invoke("app:set-theme", theme),
   checkForUpdates: () => ipcRenderer.invoke("app:check-for-updates"),
   onUpdateStatus: (callback) => {
     if (typeof callback !== "function") throw new TypeError("È necessario specificare un callback valido.");

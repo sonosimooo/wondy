@@ -6,6 +6,7 @@ let activeStatusFilter = "";
 let alphabeticalSort = false;
 let toastTimeout = 0;
 let updateBusy = false;
+let currentTheme = "light";
 
 const ui = {
   navigation: document.querySelector("#board-navigation"),
@@ -14,6 +15,8 @@ const ui = {
   breadcrumb: document.querySelector("#breadcrumb-board"),
   view: document.querySelector("#board-view"),
   search: document.querySelector("#search-input"),
+  themeToggle: document.querySelector("#theme-toggle"),
+  themeToggleIcon: document.querySelector("#theme-toggle-icon"),
   statusFilter: document.querySelector("#status-filter"),
   appVersion: document.querySelector("#app-version"),
   appUpdateStatus: document.querySelector("#app-update-status"),
@@ -77,6 +80,30 @@ function toast(message) {
   ui.toast.classList.add("visible");
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => ui.toast.classList.remove("visible"), 2800);
+}
+
+function applyTheme(theme) {
+  currentTheme = theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = currentTheme;
+  const nextThemeLabel = currentTheme === "dark" ? "chiara" : "scura";
+  ui.themeToggle.setAttribute("aria-label", `Attiva modalità ${nextThemeLabel}`);
+  ui.themeToggle.title = `Attiva modalità ${nextThemeLabel}`;
+  ui.themeToggle.setAttribute("aria-pressed", String(currentTheme === "dark"));
+  ui.themeToggleIcon.textContent = currentTheme === "dark" ? "☀" : "☾";
+}
+
+async function toggleTheme() {
+  const nextTheme = currentTheme === "dark" ? "light" : "dark";
+  ui.themeToggle.disabled = true;
+  try {
+    await window.wondy.setTheme(nextTheme);
+    applyTheme(nextTheme);
+  } catch (error) {
+    console.error("Impossibile salvare la preferenza del tema.", error);
+    toast("Impossibile salvare la modalità scelta. Riprova.");
+  } finally {
+    ui.themeToggle.disabled = false;
+  }
 }
 
 async function saveOrRestore(previous, message) {
@@ -753,6 +780,7 @@ document.querySelector("#add-group-button").addEventListener("click", addGroup);
 document.querySelector("#rename-board-button").addEventListener("click", manageBoard);
 document.querySelector("#rename-board-action").addEventListener("click", renameBoard);
 document.querySelector("#column-type").addEventListener("change", showStatusOptions);
+ui.themeToggle.addEventListener("click", toggleTheme);
 ui.columnForm.addEventListener("submit", createColumn);
 ui.boardForm.addEventListener("submit", createBoard);
 ui.search.addEventListener("input", () => renderGroups(board()));
@@ -822,6 +850,14 @@ async function initialize() {
   }
   try {
     state = await window.wondy.loadWorkspace();
+    let themeLoadError = false;
+    try {
+      applyTheme(await window.wondy.getTheme());
+    } catch (error) {
+      themeLoadError = true;
+      console.error("Impossibile caricare la preferenza del tema.", error);
+      applyTheme("light");
+    }
     try {
       const version = await window.wondy.getVersion();
       if (typeof version === "string" && /^\d+\.\d+\.\d+/.test(version)) {
@@ -835,6 +871,7 @@ async function initialize() {
       ui.description.textContent = "Crea la tua prima tabella per organizzare il lavoro.";
     }
     render();
+    if (themeLoadError) toast("Impossibile caricare la modalità salvata. È attiva la modalità chiara.");
   } catch (error) {
     console.error("Impossibile caricare il database di Wondy.", error);
     document.body.replaceChildren(element("main", "startup-error", "Impossibile aprire il database. Verifica di poter scrivere nella cartella dati dell'app e riavvia Wondy."));
