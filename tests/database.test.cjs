@@ -131,6 +131,57 @@ test("salva la modalità scelta e la mantiene dopo aver riaperto il database", (
   reopened.close();
 });
 
+test("trova e memorizza i promemoria per le scadenze senza ripeterli", (context) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), "wondy-reminders-"));
+  context.after(() => rmSync(directory, { recursive: true, force: true }));
+  const database = new WorkspaceDatabase(path.join(directory, "workspace.sqlite"));
+  const workspace = database.load();
+  const board = workspace.boards[0];
+  const activeGroup = board.groups.find((group) => group.kind === "active");
+  const completedGroup = board.groups.find((group) => group.kind === "completed");
+  const deadlineColumn = board.columns.find((column) => column.type === "date");
+  const makeItem = (id, name, groupId, dueDate) => ({
+    id,
+    groupId,
+    name,
+    position: board.items.length,
+    previousGroupId: "",
+    cells: Object.fromEntries(board.columns
+      .filter((column) => column.type !== "name")
+      .map((column) => [column.id, column.id === deadlineColumn.id ? dueDate : ""]))
+  });
+  board.items = [
+    makeItem("reminder-overdue", "Attività scaduta", activeGroup.id, "2026-11-02"),
+    makeItem("reminder-today", "Attività di oggi", activeGroup.id, "2026-11-03"),
+    makeItem("reminder-tomorrow", "Attività di domani", activeGroup.id, "2026-11-04"),
+    makeItem("reminder-future", "Attività futura", activeGroup.id, "2026-11-05"),
+    makeItem("reminder-completed", "Attività completata", completedGroup.id, "2026-11-02")
+  ];
+  database.save(workspace);
+
+  const reminders = database.getPendingDeadlineReminders("2026-11-03");
+  assert.deepEqual(reminders.map(({ itemId, reminderType }) => [itemId, reminderType]), [
+    ["reminder-overdue", "overdue"],
+    ["reminder-today", "today"],
+    ["reminder-tomorrow", "tomorrow"]
+  ]);
+  database.markDeadlineRemindersSent(reminders, "2026-11-03T08:00:00.000Z");
+  assert.deepEqual(database.getPendingDeadlineReminders("2026-11-03"), []);
+
+  board.items.find((item) => item.id === "reminder-tomorrow").cells[deadlineColumn.id] = "2026-11-06";
+  database.save(workspace);
+  assert.deepEqual(database.getPendingDeadlineReminders("2026-11-05").map(({ itemId, reminderType }) => [
+    itemId,
+    reminderType
+  ]), [
+    ["reminder-today", "overdue"],
+    ["reminder-future", "today"],
+    ["reminder-tomorrow", "tomorrow"]
+  ]);
+  assert.throws(() => database.getPendingDeadlineReminders("2026-02-30"), /data di controllo/);
+  database.close();
+});
+
 test("aggiorna un database esistente conservando gli elementi", (context) => {
   const directory = mkdtempSync(path.join(os.tmpdir(), "wondy-migration-"));
   context.after(() => rmSync(directory, { recursive: true, force: true }));

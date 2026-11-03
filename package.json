@@ -1,6 +1,6 @@
 {
   "name": "wondy-desktop",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "Tabelle condivise per organizzare progetti e attività.",
   "main": "main.cjs",
   "author": "Wondy",
@@ -41,6 +41,7 @@
       "main.cjs",
       "preload.cjs",
       "updater.cjs",
+      "deadline-reminders.cjs",
       "database.cjs",
       "index.html",
       "styles.css",

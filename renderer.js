@@ -7,6 +7,9 @@ let alphabeticalSort = false;
 let toastTimeout = 0;
 let updateBusy = false;
 let currentTheme = "light";
+let currentView = "table";
+let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let pendingCalendarReminder = null;
 
 const ui = {
   navigation: document.querySelector("#board-navigation"),
@@ -14,6 +17,13 @@ const ui = {
   description: document.querySelector("#board-description"),
   breadcrumb: document.querySelector("#breadcrumb-board"),
   view: document.querySelector("#board-view"),
+  calendarView: document.querySelector("#calendar-view"),
+  calendarGrid: document.querySelector("#calendar-grid"),
+  calendarMonth: document.querySelector("#calendar-month"),
+  tableViewButton: document.querySelector("#table-view-button"),
+  calendarViewButton: document.querySelector("#calendar-view-button"),
+  tableToolbarActions: document.querySelector("#table-toolbar-actions"),
+  addRowToBoard: document.querySelector("#board-add-row-button"),
   search: document.querySelector("#search-input"),
   themeToggle: document.querySelector("#theme-toggle"),
   themeToggleIcon: document.querySelector("#theme-toggle-icon"),
@@ -142,6 +152,7 @@ function render() {
     ui.breadcrumb.textContent = "Nessuna tabella";
     ui.navigation.replaceChildren();
     ui.view.replaceChildren();
+    ui.calendarGrid.replaceChildren();
     return;
   }
   const current = board();
@@ -151,7 +162,21 @@ function render() {
   ui.breadcrumb.textContent = current.name;
   renderNavigation();
   renderFilter(current);
-  renderGroups(current);
+  renderCurrentView(current);
+}
+
+function renderCurrentView(current) {
+  const isCalendar = currentView === "calendar";
+  ui.view.hidden = isCalendar;
+  ui.calendarView.hidden = !isCalendar;
+  ui.addRowToBoard.hidden = isCalendar;
+  ui.tableToolbarActions.hidden = isCalendar;
+  ui.tableViewButton.classList.toggle("selected", !isCalendar);
+  ui.tableViewButton.setAttribute("aria-selected", String(!isCalendar));
+  ui.calendarViewButton.classList.toggle("selected", isCalendar);
+  ui.calendarViewButton.setAttribute("aria-selected", String(isCalendar));
+  if (isCalendar) renderCalendar(current);
+  else renderGroups(current);
 }
 
 function renderNavigation() {
@@ -221,6 +246,124 @@ function renderGroups(current) {
     const empty = element("div", "empty-state");
     empty.append(element("strong", "", "Nessun gruppo"), element("span", "", "Crea un gruppo per aggiungere elementi."));
     ui.view.append(empty);
+  }
+}
+
+function validDateParts(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return { year, month, day, date };
+}
+
+function formatCalendarDate(value) {
+  const parts = validDateParts(value);
+  return parts
+    ? new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long" }).format(parts.date)
+    : value;
+}
+
+function renderCalendar(current) {
+  const monthLabel = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric" }).format(calendarMonth);
+  ui.calendarMonth.textContent = monthLabel.charAt(0).toLocaleUpperCase("it") + monthLabel.slice(1);
+  ui.calendarGrid.replaceChildren();
+
+  const dateColumns = current.columns.filter((column) => column.type === "date");
+  const groups = new Map(current.groups.map((group) => [group.id, group]));
+  const entriesByDate = new Map();
+  for (const item of current.items) {
+    const group = groups.get(item.groupId);
+    for (const column of dateColumns) {
+      const dueDate = item.cells[column.id];
+      if (!validDateParts(dueDate)) continue;
+      const entry = { item, group, dueDate, column };
+      if (!entriesByDate.has(dueDate)) entriesByDate.set(dueDate, []);
+      entriesByDate.get(dueDate).push(entry);
+    }
+  }
+
+  const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+  const gridStart = new Date(firstDay);
+  gridStart.setDate(gridStart.getDate() - ((firstDay.getDay() + 6) % 7));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let index = 0; index < 42; index += 1) {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const isCurrentMonth = date.getMonth() === calendarMonth.getMonth();
+    const isToday = date.getTime() === today.getTime();
+    const day = element("div", `calendar-day${isCurrentMonth ? "" : " calendar-day-outside"}${isToday ? " calendar-day-today" : ""}`);
+    day.setAttribute("role", "group");
+    day.setAttribute("aria-label", new Intl.DateTimeFormat("it-IT", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }).format(date));
+    day.append(element("span", "calendar-day-number", String(date.getDate())));
+
+    for (const entry of entriesByDate.get(dateKey) || []) {
+      const completed = entry.group?.kind === "completed";
+      const taskButton = button(
+        `calendar-task${completed ? " calendar-task-completed" : ""}`,
+        entry.item.name,
+        `Apri ${entry.item.name}, ${entry.column.name.toLocaleLowerCase("it")} ${formatCalendarDate(dateKey)}${completed ? ", completata" : ""}, nella tabella`,
+        () => openTaskInTable(current.id, entry.item.id)
+      );
+      taskButton.title = `${entry.item.name} · ${entry.group?.name || ""} · ${entry.column.name}`;
+      taskButton.style.setProperty("--calendar-group-color", entry.group?.color || "#5b9df5");
+      day.append(taskButton);
+    }
+    ui.calendarGrid.append(day);
+  }
+}
+
+function setCalendarMonth(date) {
+  calendarMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+}
+
+function showCalendar(date) {
+  if (date) setCalendarMonth(date);
+  currentView = "calendar";
+  renderCurrentView(board());
+}
+
+function showTable() {
+  currentView = "table";
+  renderCurrentView(board());
+}
+
+async function openTaskInTable(boardId, itemId) {
+  const targetBoard = state.boards.find((entry) => entry.id === boardId);
+  if (!targetBoard || !targetBoard.items.some((item) => item.id === itemId)) {
+    toast("L’attività non è più disponibile.");
+    return;
+  }
+  const previousBoardId = state.activeBoardId;
+  state.activeBoardId = boardId;
+  activeStatusFilter = "";
+  ui.search.value = "";
+  currentView = "table";
+  try {
+    await window.wondy.saveWorkspace(state);
+    render();
+    const row = ui.view.querySelector(`tr[data-item-id="${CSS.escape(itemId)}"]`);
+    if (!row) {
+      toast("L’attività esiste, ma non è visibile nella tabella.");
+      return;
+    }
+    row.classList.add("calendar-return-highlight");
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    row.querySelector(".item-name-input")?.focus({ preventScroll: true });
+    window.setTimeout(() => row.classList.remove("calendar-return-highlight"), 2400);
+  } catch (error) {
+    state.activeBoardId = previousBoardId;
+    render();
+    console.error("Impossibile aprire l’attività dalla vista calendario.", error);
+    toast("Impossibile aprire l’attività nella tabella. Riprova.");
   }
 }
 
@@ -379,7 +522,11 @@ function renderCell(item, column) {
     input.setAttribute("aria-label", `${column.name} per ${item.name}`);
     if (deadline) input.title = deadline.description;
     input.addEventListener("change", () => updateCell(item, column, input.value));
-    container.append(input);
+    const calendarButton = button("deadline-calendar-button", "▦", `Mostra ${item.name} nel calendario`, () => {
+      const parts = validDateParts(cellValue);
+      showCalendar(parts?.date);
+    });
+    container.append(input, calendarButton);
     return container;
   }
   const input = document.createElement("input");
@@ -781,7 +928,21 @@ document.querySelector("#column-type").addEventListener("change", showStatusOpti
 ui.themeToggle.addEventListener("click", toggleTheme);
 ui.columnForm.addEventListener("submit", createColumn);
 ui.boardForm.addEventListener("submit", createBoard);
-ui.search.addEventListener("input", () => renderGroups(board()));
+ui.search.addEventListener("input", () => renderCurrentView(board()));
+ui.tableViewButton.addEventListener("click", showTable);
+ui.calendarViewButton.addEventListener("click", () => showCalendar());
+document.querySelector("#calendar-previous-month").addEventListener("click", () => {
+  setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1));
+  renderCalendar(board());
+});
+document.querySelector("#calendar-next-month").addEventListener("click", () => {
+  setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1));
+  renderCalendar(board());
+});
+document.querySelector("#calendar-today-button").addEventListener("click", () => {
+  setCalendarMonth(new Date());
+  renderCalendar(board());
+});
 ui.checkUpdates.addEventListener("click", async () => {
   ui.checkUpdates.disabled = true;
   ui.appUpdateStatus.textContent = "Avvio del controllo degli aggiornamenti…";
@@ -815,16 +976,28 @@ if (window.wondy?.onUpdateStatus) {
     ui.checkUpdates.disabled = updateBusy;
   });
 }
+if (window.wondy?.onReminderStatus) {
+  window.wondy.onReminderStatus((message) => toast(message));
+}
+if (window.wondy?.onOpenCalendarReminder) {
+  window.wondy.onOpenCalendarReminder((reminder) => {
+    if (!state) {
+      pendingCalendarReminder = reminder;
+      return;
+    }
+    openCalendarReminder(reminder);
+  });
+}
 ui.statusFilter.addEventListener("change", () => {
   activeStatusFilter = ui.statusFilter.value;
-  renderGroups(board());
+  renderCurrentView(board());
 });
 document.querySelector("#sort-button").addEventListener("click", (event) => {
   alphabeticalSort = !alphabeticalSort;
   event.currentTarget.setAttribute("aria-pressed", String(alphabeticalSort));
   event.currentTarget.classList.toggle("toolbar-button-active", alphabeticalSort);
   event.currentTarget.lastChild.textContent = alphabeticalSort ? " Ordine originale" : " Ordina per nome";
-  renderGroups(board());
+  renderCurrentView(board());
 });
 document.querySelectorAll("[data-close-dialog]").forEach((closeButton) => {
   closeButton.addEventListener("click", () => closeButton.closest("dialog").close());
@@ -841,6 +1014,26 @@ window.addEventListener("keydown", (event) => {
   }
 });
 
+function openCalendarReminder({ boardId, itemId, dueDate }) {
+  const parts = validDateParts(dueDate);
+  if (!parts) {
+    toast("La data del promemoria non è valida.");
+    return;
+  }
+  const targetBoard = state?.boards.find((entry) => entry.id === boardId);
+  if (!targetBoard) {
+    toast("La tabella del promemoria non è più disponibile.");
+    return;
+  }
+  state.activeBoardId = targetBoard.id;
+  calendarMonth = new Date(parts.year, parts.month - 1, 1);
+  render();
+  showCalendar(parts.date);
+  if (!targetBoard.items.some((item) => item.id === itemId)) {
+    toast("L’attività è stata rimossa; mostro comunque la data nel calendario.");
+  }
+}
+
 async function initialize() {
   if (!window.wondy) {
     document.body.replaceChildren(element("main", "startup-error", "Impossibile collegarsi al database di Wondy. Chiudi e riapri l'applicazione."));
@@ -848,6 +1041,7 @@ async function initialize() {
   }
   try {
     state = await window.wondy.loadWorkspace();
+    setCalendarMonth(new Date());
     let themeLoadError = false;
     try {
       applyTheme(await window.wondy.getTheme());
@@ -870,6 +1064,11 @@ async function initialize() {
     }
     render();
     if (themeLoadError) toast("Impossibile caricare la modalità salvata. È attiva la modalità chiara.");
+    if (pendingCalendarReminder) {
+      const reminder = pendingCalendarReminder;
+      pendingCalendarReminder = null;
+      openCalendarReminder(reminder);
+    }
   } catch (error) {
     console.error("Impossibile caricare il database di Wondy.", error);
     document.body.replaceChildren(element("main", "startup-error", "Impossibile aprire il database. Verifica di poter scrivere nella cartella dati dell'app e riavvia Wondy."));

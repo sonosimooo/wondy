@@ -1,12 +1,15 @@
-const { app, BrowserWindow, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, Notification } = require("electron");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 const { autoUpdater } = require("electron-updater");
 const { WorkspaceDatabase } = require("./database.cjs");
 const { registerAutoUpdater } = require("./updater.cjs");
+const { registerDeadlineReminders } = require("./deadline-reminders.cjs");
 
 let database;
 let updates;
+let deadlineReminders;
+let mainWindow;
 
 function createWindow() {
   const window = new BrowserWindow({
@@ -25,6 +28,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs")
     }
   });
+  mainWindow = window;
 
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   const appPage = pathToFileURL(path.join(__dirname, "index.html")).href;
@@ -33,6 +37,12 @@ function createWindow() {
   });
   window.once("ready-to-show", () => {
     void updates.start();
+    void deadlineReminders.start().catch((error) => {
+      console.error("Impossibile avviare i promemoria delle scadenze.", error);
+    });
+  });
+  window.on("closed", () => {
+    if (mainWindow === window) mainWindow = null;
   });
   window.loadFile(path.join(__dirname, "index.html")).catch((error) => {
     console.error("Impossibile aprire la finestra principale di Wondy.", error);
@@ -46,6 +56,23 @@ app.whenReady()
     app.setAppUserModelId("com.wondy.desktop");
     database = new WorkspaceDatabase(path.join(app.getPath("userData"), "wondy.sqlite"));
     updates = registerAutoUpdater({ app, autoUpdater, dialog, BrowserWindow });
+    deadlineReminders = registerDeadlineReminders({
+      database,
+      Notification,
+      BrowserWindow,
+      onOpenReminder: (reminder) => {
+        const window = mainWindow;
+        if (!window || window.isDestroyed()) return;
+        if (window.isMinimized()) window.restore();
+        window.show();
+        window.focus();
+        window.webContents.send("app:open-calendar-reminder", {
+          boardId: reminder.boardId,
+          itemId: reminder.itemId,
+          dueDate: reminder.dueDate
+        });
+      }
+    });
     const appPage = pathToFileURL(path.join(__dirname, "index.html")).href;
     const isTrustedApp = (event) => event.senderFrame?.url === appPage;
     ipcMain.handle("workspace:load", () => database.load());
@@ -81,5 +108,6 @@ app.on("window-all-closed", () => {
 
 app.on("before-quit", () => {
   if (updates) updates.dispose();
+  if (deadlineReminders) deadlineReminders.dispose();
   if (database) database.close();
 });

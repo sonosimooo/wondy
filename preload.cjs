@@ -12,5 +12,17 @@ contextBridge.exposeInMainWorld("wondy", Object.freeze({
     const listener = (_event, status) => callback(status);
     ipcRenderer.on("app:update-status", listener);
     return () => ipcRenderer.removeListener("app:update-status", listener);
+  },
+  onReminderStatus: (callback) => {
+    if (typeof callback !== "function") throw new TypeError("È necessario specificare un callback valido.");
+    const listener = (_event, message) => callback(message);
+    ipcRenderer.on("app:reminder-status", listener);
+    return () => ipcRenderer.removeListener("app:reminder-status", listener);
+  },
+  onOpenCalendarReminder: (callback) => {
+    if (typeof callback !== "function") throw new TypeError("È necessario specificare un callback valido.");
+    const listener = (_event, reminder) => callback(reminder);
+    ipcRenderer.on("app:open-calendar-reminder", listener);
+    return () => ipcRenderer.removeListener("app:open-calendar-reminder", listener);
   }
 }));

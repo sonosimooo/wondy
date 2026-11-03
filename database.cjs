@@ -106,6 +106,14 @@ class WorkspaceDatabase {
         value TEXT NOT NULL DEFAULT '',
         PRIMARY KEY (item_id, column_id)
       );
+      CREATE TABLE IF NOT EXISTS deadline_reminders (
+        item_id TEXT NOT NULL,
+        column_id TEXT NOT NULL,
+        due_date TEXT NOT NULL,
+        reminder_type TEXT NOT NULL CHECK (reminder_type IN ('tomorrow', 'today', 'overdue')),
+        notified_at TEXT NOT NULL,
+        PRIMARY KEY (item_id, column_id, due_date, reminder_type)
+      );
       CREATE TABLE IF NOT EXISTS workspace_metadata (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         active_board_id TEXT REFERENCES boards(id) ON DELETE SET NULL,
@@ -278,6 +286,82 @@ class WorkspaceDatabase {
     return true;
   }
 
+  getPendingDeadlineReminders(today) {
+    if (typeof today !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(today)) {
+      throw new TypeError("La data di controllo dei promemoria non è valida.");
+    }
+    const tomorrowDate = new Date(`${today}T00:00:00.000Z`);
+    if (Number.isNaN(tomorrowDate.getTime()) || tomorrowDate.toISOString().slice(0, 10) !== today) {
+      throw new TypeError("La data di controllo dei promemoria non è valida.");
+    }
+    tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
+    const tomorrow = tomorrowDate.toISOString().slice(0, 10);
+    const yesterdayDate = new Date(`${today}T00:00:00.000Z`);
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+    const yesterday = yesterdayDate.toISOString().slice(0, 10);
+    const rows = this.db.prepare(`
+      SELECT board_items.id AS itemId, boards.id AS boardId, boards.name AS boardName,
+        board_items.name AS itemName, task_groups.name AS groupName,
+        board_columns.id AS columnId, board_columns.name AS columnName, item_cells.value AS dueDate
+      FROM board_items
+      JOIN boards ON boards.id = board_items.board_id
+      JOIN task_groups ON task_groups.id = board_items.group_id
+      JOIN board_columns ON board_columns.board_id = boards.id AND board_columns.type = 'date'
+      JOIN item_cells ON item_cells.item_id = board_items.id AND item_cells.column_id = board_columns.id
+      WHERE task_groups.kind <> 'completed'
+        AND item_cells.value GLOB '????-??-??'
+        AND date(item_cells.value) = item_cells.value
+        AND item_cells.value <= ?
+      ORDER BY item_cells.value, boards.position, board_items.position
+    `).all(tomorrow);
+    const isSent = this.db.prepare(`
+      SELECT 1 FROM deadline_reminders
+      WHERE item_id = ? AND column_id = ? AND due_date = ? AND reminder_type = ?
+    `);
+    const pending = [];
+    for (const row of rows) {
+      const reminderType = row.dueDate === tomorrow
+        ? "tomorrow"
+        : row.dueDate === today
+          ? "today"
+          : row.dueDate <= yesterday
+            ? "overdue"
+            : "";
+      if (!reminderType || isSent.get(row.itemId, row.columnId, row.dueDate, reminderType)) continue;
+      pending.push({ ...row, reminderType });
+    }
+    return pending;
+  }
+
+  markDeadlineRemindersSent(reminders, notifiedAt) {
+    if (!Array.isArray(reminders) || typeof notifiedAt !== "string" || Number.isNaN(Date.parse(notifiedAt))) {
+      throw new TypeError("I dati del promemoria non sono validi.");
+    }
+    for (const reminder of reminders) {
+      requireId(reminder.itemId, "L'ID dell'attività");
+      requireId(reminder.columnId, "L'ID della colonna");
+      if (typeof reminder.dueDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(reminder.dueDate) ||
+          !["tomorrow", "today", "overdue"].includes(reminder.reminderType)) {
+        throw new TypeError("I dati del promemoria non sono validi.");
+      }
+    }
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const insert = this.db.prepare(`
+        INSERT OR IGNORE INTO deadline_reminders (item_id, column_id, due_date, reminder_type, notified_at)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+      for (const reminder of reminders) {
+        insert.run(reminder.itemId, reminder.columnId, reminder.dueDate, reminder.reminderType, notifiedAt);
+      }
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+    return true;
+  }
+
   save(workspace) {
     if (!workspace || !Array.isArray(workspace.boards) || workspace.boards.length > 100) {
       throw new TypeError("Lo spazio di lavoro non è valido.");
@@ -381,6 +465,18 @@ class WorkspaceDatabase {
           }
         }
       }
+      this.db.exec(`
+        DELETE FROM deadline_reminders
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM board_items
+          JOIN board_columns ON board_columns.id = deadline_reminders.column_id
+          JOIN item_cells ON item_cells.item_id = board_items.id AND item_cells.column_id = board_columns.id
+          WHERE board_items.id = deadline_reminders.item_id
+            AND board_columns.type = 'date'
+            AND item_cells.value = deadline_reminders.due_date
+        )
+      `);
       const activeBoardId = boardIds.has(workspace.activeBoardId)
         ? workspace.activeBoardId
         : (workspace.boards[0]?.id ?? null);

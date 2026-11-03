@@ -75,8 +75,11 @@
           </div>
 
           <div class="board-toolbar">
-            <div class="table-tab"><span aria-hidden="true">▤</span> Scheda principale</div>
-            <div class="toolbar-actions">
+            <div class="board-view-tabs" role="tablist" aria-label="Visualizzazione della tabella">
+              <button id="table-view-button" class="board-view-tab selected" type="button" role="tab" aria-selected="true" aria-controls="board-view"><span aria-hidden="true">▤</span> Tabella</button>
+              <button id="calendar-view-button" class="board-view-tab" type="button" role="tab" aria-selected="false" aria-controls="calendar-view"><span aria-hidden="true">▦</span> Calendario</button>
+            </div>
+            <div id="table-toolbar-actions" class="toolbar-actions">
               <label class="filter-label" for="status-filter">Stato:</label>
               <select id="status-filter" class="toolbar-select" aria-label="Filtra per stato">
                 <option value="">Tutti</option>
@@ -86,8 +89,23 @@
             </div>
           </div>
 
-          <div id="board-view" class="board-view" aria-live="polite"></div>
+          <div id="board-view" class="board-view" role="tabpanel" aria-labelledby="table-view-button" aria-live="polite"></div>
           <button id="board-add-row-button" class="board-add-row" type="button">＋ Aggiungi un elemento</button>
+          <section id="calendar-view" class="calendar-view" role="tabpanel" aria-labelledby="calendar-view-button" aria-label="Calendario delle scadenze" hidden>
+            <div class="calendar-toolbar">
+              <div class="calendar-month-navigation">
+                <button id="calendar-previous-month" class="calendar-nav-button" type="button" aria-label="Mese precedente">‹</button>
+                <h2 id="calendar-month" class="calendar-month" aria-live="polite"></h2>
+                <button id="calendar-next-month" class="calendar-nav-button" type="button" aria-label="Mese successivo">›</button>
+              </div>
+              <button id="calendar-today-button" class="button button-outline calendar-today-button" type="button">Oggi</button>
+            </div>
+            <div class="calendar-weekdays" aria-hidden="true">
+              <span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span>
+            </div>
+            <div id="calendar-grid" class="calendar-grid" aria-live="polite"></div>
+            <p class="calendar-hint">Seleziona un’attività per aprirla nella tabella.</p>
+          </section>
         </section>
         <footer class="app-footer">
           <span id="app-version" aria-live="polite">Wondy versione 0.0.1</span>

@@ -4,6 +4,8 @@ Wondy è un'app desktop per Windows per organizzare progetti e attività in tabe
 
 Le tabelle standard includono elemento, stato, priorità e scadenza. La modalità chiara è attiva per impostazione predefinita. Usa il pulsante con la luna/il sole nella barra superiore per passare alla modalità scura; la preferenza viene salvata sul dispositivo.
 
+La scheda **Calendario** mostra le attività con una data e permette di aprirle direttamente nella tabella; il pulsante calendario accanto a ogni data apre il mese corrispondente. Wondy invia inoltre notifiche desktop il giorno prima, il giorno della scadenza e una volta quando un'attività risulta scaduta. Le notifiche vengono controllate all'avvio e ogni 30 minuti mentre l'app è aperta.
+
 ## Requisiti
 
 - Windows 10 o successivo per l'installer.
